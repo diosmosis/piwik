@@ -86,14 +86,6 @@ class AnnotationsTest extends SystemTestCase
         );
     }
 
-    /**
-     * @dataProvider getApiForTesting
-     */
-    public function testApi($api, $params)
-    {
-        $this->runApiTests($api, $params);
-    }
-
     public function testAddMultipleSitesFail()
     {
         try {
