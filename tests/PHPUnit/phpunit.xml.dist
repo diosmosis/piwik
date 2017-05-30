@@ -20,8 +20,36 @@
 
 <testsuites>
     <testsuite name="SystemTests">
+        <!--<file>./System/AnnotationsTest.php</file>
         <file>./System/ApiGetReportMetadataTest.php</file>
-        <file>./System/OneVisitorTwoVisitsTest.php</file>
+        <file>./System/ApiGetReportMetadataYearTest.php</file>
+        <file>./System/ArchiveCronTest.php</file>
+        <file>./System/ArchiveInvalidationTest.php</file>
+        <file>./System/ArchiveWebTest.php</file>
+        <file>./System/AutoSuggestAPITest.php</file>
+        <file>./System/BackwardsCompatibility1XTest.php</file>-->
+        <file>./System/BlobReportLimitingTest.php</file>
+        <file>./System/CliMultiTest.php</file>
+        <file>./System/CsvExportTest.php</file>
+        <!--<file>./System/CustomEventsTest.php</file>
+        <file>./System/DuplicateActionsTest.php</file>
+        <file>./System/EcommerceOrderWithItemsTest.php</file>
+        <file>./System/EnvironmentValidationTest.php</file>
+        <file>./System/ExternalScriptsTest.php</file>
+        <file>./System/FlattenReportsTest.php</file>
+        <file>./System/FrontControllerTest.php</file>
+        <file>./System/ImportLogsTest.php</file>
+        <file>./System/LabelFilterTest.php</file>
+        <file>./System/ManyVisitorsOneWebsiteTest.php</file>
+        <file>./System/MultipleSitesArchivingTest.php</file>
+        <file>./System/NonUnicodeTest.php</file>
+        <file>./System/NoVisitTest.php</file>
+        <file>./System/OneVisitorLongUrlsTruncatedTest.php</file>
+        <file>./System/OneVisitorNoKeywordSpecifiedTest.php</file>
+        <file>./System/OneVisitorOneWebsiteSeveralDaysDateRangeArchivingTest.php</file>
+        <file>./System/OneVisitorOneWebsiteSeveralDaysDateRangeTest.php</file>
+        <file>./System/OneVisitorSeveralDaysImportedInRandomOrderTest.php</file>
+        <file>./System/OneVisitorTwoVisitsTest.php</file>-->
         <!--
         <file>./System/OneVisitorTwoVisitsWithCookieSupportTest.php</file>
         <file>./System/PeriodIsRangeDateIsLastNMetadataAndNormalAPITest.php</file>
