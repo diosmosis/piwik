@@ -20,8 +20,8 @@
 
 <testsuites>
     <testsuite name="SystemTests">
-        <!--<file>./System/AnnotationsTest.php</file>
-        <file>./System/ApiGetReportMetadataTest.php</file>-->
+        <!--<file>./System/AnnotationsTest.php</file>-->
+        <file>./System/ApiGetReportMetadataTest.php</file><!---->
         <file>./System/ApiGetReportMetadataYearTest.php</file>
         <file>./System/ArchiveCronTest.php</file><!---->
         <file>./System/ArchiveInvalidationTest.php</file>
