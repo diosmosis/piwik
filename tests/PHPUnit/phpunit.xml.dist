@@ -20,8 +20,67 @@
 
 <testsuites>
     <testsuite name="SystemTests">
-        <file>./System/OneVisitorTwoVisitsTest.php</file>
-<!--        <directory>../../plugins/*/tests</directory>
+        <file>tests/PHPUnit/System/AnnotationsTest.php</file>
+        <file>tests/PHPUnit/System/ApiGetReportMetadataTest.php</file>
+        <file>tests/PHPUnit/System/ApiGetReportMetadataYearTest.php</file>
+        <file>tests/PHPUnit/System/ArchiveCronTest.php</file>
+        <file>tests/PHPUnit/System/ArchiveInvalidationTest.php</file>
+        <file>tests/PHPUnit/System/ArchiveWebTest.php</file>
+        <file>tests/PHPUnit/System/AutoSuggestAPITest.php</file>
+        <file>tests/PHPUnit/System/BackwardsCompatibility1XTest.php</file>
+        <file>tests/PHPUnit/System/BlobReportLimitingTest.php</file>
+        <file>tests/PHPUnit/System/CliMultiTest.php</file>
+        <file>tests/PHPUnit/System/CsvExportTest.php</file>
+        <file>tests/PHPUnit/System/CustomEventsTest.php</file>
+        <file>tests/PHPUnit/System/DuplicateActionsTest.php</file>
+        <file>tests/PHPUnit/System/EcommerceOrderWithItemsTest.php</file>
+        <file>tests/PHPUnit/System/EnvironmentValidationTest.php</file>
+        <file>tests/PHPUnit/System/ExternalScriptsTest.php</file>
+        <file>tests/PHPUnit/System/FlattenReportsTest.php</file>
+        <file>tests/PHPUnit/System/FrontControllerTest.php</file>
+        <file>tests/PHPUnit/System/ImportLogsTest.php</file>
+        <file>tests/PHPUnit/System/LabelFilterTest.php</file>
+        <file>tests/PHPUnit/System/ManyVisitorsOneWebsiteTest.php</file>
+        <file>tests/PHPUnit/System/MultipleSitesArchivingTest.php</file>
+        <file>tests/PHPUnit/System/NonUnicodeTest.php</file>
+        <file>tests/PHPUnit/System/NoVisitTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorLongUrlsTruncatedTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorNoKeywordSpecifiedTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorOneWebsiteSeveralDaysDateRangeArchivingTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorOneWebsiteSeveralDaysDateRangeTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorSeveralDaysImportedInRandomOrderTest.php</file>
+        <file>tests/PHPUnit/System/OneVisitorTwoVisitsTest.php</file>
+        <!--
+        <file>tests/PHPUnit/System/OneVisitorTwoVisitsWithCookieSupportTest.php</file>
+        <file>tests/PHPUnit/System/PeriodIsRangeDateIsLastNMetadataAndNormalAPITest.php</file>
+        <file>tests/PHPUnit/System/PivotByQueryParamTest.php</file>
+        <file>tests/PHPUnit/System/PurgeDataTest.php</file>
+        <file>tests/PHPUnit/System/RawLogDaoTest.php</file>
+        <file>tests/PHPUnit/System/RowEvolutionTest.php</file>
+        <file>tests/PHPUnit/System/SimulateAutoIncrementIntegerOverflowTest.php</file>
+        <file>tests/PHPUnit/System/SiteSearchTest.php</file>
+        <file>tests/PHPUnit/System/TimezonesTest.php</file>
+        <file>tests/PHPUnit/System/TrackCustomVariablesAndCampaignsForceUsingVisitIdNotHeuristicsTest.php</file>
+        <file>tests/PHPUnit/System/TrackerResponseTest.php</file>
+        <file>tests/PHPUnit/System/TrackerTest.php</file>
+        <file>tests/PHPUnit/System/TrackerWindowLookBackTest.php</file>
+        <file>tests/PHPUnit/System/TrackGoalsAllowMultipleConversionsPerVisitTest.php</file>
+        <file>tests/PHPUnit/System/TrackGoalsOneConversionPerVisitTest.php</file>
+        <file>tests/PHPUnit/System/TransitionsTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitorsTwoWebsitesDifferentDaysArchivingDisabledTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitorsTwoWebsitesDifferentDaysConversionsTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitorsTwoWebsitesDifferentDaysTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitsWithCustomVariablesSegmentContainsTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitsWithCustomVariablesSegmentMatchALLNoGoalDataTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitsWithCustomVariablesSegmentMatchNONETest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitsWithCustomVariablesSegmentMatchVisitorTypeTest.php</file>
+        <file>tests/PHPUnit/System/TwoVisitsWithCustomVariablesTest.php</file>
+        <file>tests/PHPUnit/System/UrlNormalizationTest.php</file>
+        <file>tests/PHPUnit/System/UserIdAndVisitorIdTest.php</file>
+        <file>tests/PHPUnit/System/VisitsInPastInvalidateOldReportsTest.php</file>
+        -->
+
+        <!--        <directory>../../plugins/*/tests</directory>
         <directory>../../plugins/*/Test</directory>
         <exclude>../../plugins/*/tests/Integration</exclude>
         <exclude>../../plugins/*/Test/Integration</exclude>
