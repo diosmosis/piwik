@@ -23,11 +23,11 @@
         <!--<file>./System/AnnotationsTest.php</file>
         <file>./System/ApiGetReportMetadataTest.php</file>
         <file>./System/ApiGetReportMetadataYearTest.php</file>
-        <file>./System/ArchiveCronTest.php</file>
+        <file>./System/ArchiveCronTest.php</file>-->
         <file>./System/ArchiveInvalidationTest.php</file>
         <file>./System/ArchiveWebTest.php</file>
         <file>./System/AutoSuggestAPITest.php</file>
-        <file>./System/BackwardsCompatibility1XTest.php</file>-->
+        <file>./System/BackwardsCompatibility1XTest.php</file><!---->
         <file>./System/BlobReportLimitingTest.php</file>
         <file>./System/CliMultiTest.php</file>
         <file>./System/CsvExportTest.php</file>
