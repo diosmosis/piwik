@@ -20,7 +20,7 @@
 
 <testsuites>
     <testsuite name="SystemTests">
-        <file>./System/AnnotationsTest.php</file>
+        <file>./System/ApiGetReportMetadataTest.php</file>
         <file>./System/OneVisitorTwoVisitsTest.php</file>
         <!--
         <file>./System/OneVisitorTwoVisitsWithCookieSupportTest.php</file>

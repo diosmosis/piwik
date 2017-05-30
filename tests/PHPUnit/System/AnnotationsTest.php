@@ -51,7 +51,7 @@ class AnnotationsTest extends SystemTestCase
                                               'periods'                => array('week'),
                                               'otherRequestParameters' => array('lastN' => 6),
                                               'testSuffix'             => '_lastN')),
-            /*array('Annotations.getAll', array('idSite'                 => $idSite1,
+            array('Annotations.getAll', array('idSite'                 => $idSite1,
                                               'date'                   => '2012-01-15,2012-02-15',
                                               'periods'                => array('range'),
                                               'otherRequestParameters' => array('lastN' => 6),
@@ -82,8 +82,15 @@ class AnnotationsTest extends SystemTestCase
                                                                   'date'       => '2012-01-01',
                                                                   'periods'    => array('month'),
                                                                   'testSuffix' => '_multipleSites')),
-            */
         );
+    }
+
+    /**
+     * @dataProvider getApiForTesting
+     */
+    public function testApi($api, $params)
+    {
+        $this->runApiTests($api, $params);
     }
 
     public function testAddMultipleSitesFail()
