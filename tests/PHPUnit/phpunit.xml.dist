@@ -20,7 +20,7 @@
 
 <testsuites>
     <testsuite name="SystemTests">
-        <file>./System/AnnotationsTest.php</file>
+        <!--<file>./System/AnnotationsTest.php</file>
         <file>./System/ApiGetReportMetadataTest.php</file>
         <file>./System/ApiGetReportMetadataYearTest.php</file>
         <file>./System/ArchiveCronTest.php</file>
@@ -34,7 +34,7 @@
         <file>./System/CustomEventsTest.php</file>
         <file>./System/DuplicateActionsTest.php</file>
         <file>./System/EcommerceOrderWithItemsTest.php</file>
-        <file>./System/EnvironmentValidationTest.php</file>
+        <file>./System/EnvironmentValidationTest.php</file>-->
         <file>./System/ExternalScriptsTest.php</file>
         <file>./System/FlattenReportsTest.php</file>
         <file>./System/FrontControllerTest.php</file>
