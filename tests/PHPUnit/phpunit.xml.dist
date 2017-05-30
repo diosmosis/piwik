@@ -48,8 +48,8 @@
         <file>./System/OneVisitorNoKeywordSpecifiedTest.php</file>
         <file>./System/OneVisitorOneWebsiteSeveralDaysDateRangeArchivingTest.php</file>
         <file>./System/OneVisitorOneWebsiteSeveralDaysDateRangeTest.php</file>
-        <file>./System/OneVisitorSeveralDaysImportedInRandomOrderTest.php</file>
-        <file>./System/OneVisitorTwoVisitsTest.php</file>-->
+        <file>./System/OneVisitorSeveralDaysImportedInRandomOrderTest.php</file>-->
+        <file>./System/OneVisitorTwoVisitsTest.php</file>
         <!--
         <file>./System/OneVisitorTwoVisitsWithCookieSupportTest.php</file>
         <file>./System/PeriodIsRangeDateIsLastNMetadataAndNormalAPITest.php</file>
