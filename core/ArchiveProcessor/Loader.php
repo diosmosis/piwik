@@ -161,12 +161,12 @@ class Loader
     {
         $noArchiveFound = array(false, false, false);
 
-        // see isArchiveTemporary()
-        $minDatetimeArchiveProcessedUTC = $this->getMinTimeArchiveProcessed();
-
         if ($this->isArchivingForcedToTrigger()) {
             return $noArchiveFound;
         }
+
+        // see isArchiveTemporary()
+        $minDatetimeArchiveProcessedUTC = $this->getMinTimeArchiveProcessed();
 
         $idAndVisits = ArchiveSelector::getArchiveIdAndVisits($this->params, $minDatetimeArchiveProcessedUTC);
 

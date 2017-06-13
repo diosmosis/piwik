@@ -78,6 +78,13 @@ class OneVisitorTwoVisitsTest extends SystemTestCase
         foreach ($bulkUrls as &$url) {
             $url = urlencode($url);
         }
+return [array('API.getProcessedReport', array('idSite'        => $idSite,
+    'date'          => $dateTime,
+    'periods'       => array('week'),
+    'apiModule'     => 'Actions',
+    'apiAction'     => 'getPageUrls',
+    'supertableApi' => 'Actions.getPageUrls',
+    'testSuffix'    => '__subtable'))];
         return array(
             array('all', array('idSite' => $idSite,
                                'date' => $dateTime,

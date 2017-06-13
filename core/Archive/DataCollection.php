@@ -138,6 +138,17 @@ class DataCollection
     }
 
     /**
+     * TODO
+     * @param $idSite
+     * @param $period
+     * @return bool
+     */
+    public function has($idSite, $period)
+    {
+        return !empty($this->data[$idSite][$period]);
+    }
+
+    /**
      * Set data for a specific site & period. If there is no data for the given site ID & period,
      * it is set to the default row.
      *

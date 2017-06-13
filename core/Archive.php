@@ -8,6 +8,8 @@
  */
 namespace Piwik;
 
+use Doctrine\Common\Cache\MultiGetCache;
+use Piwik\Archive\ArchiveTableStore;
 use Piwik\Archive\Parameters;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\Archive\ArchiveInvalidator;
@@ -113,6 +115,11 @@ class Archive
     const ID_SUBTABLE_LOAD_ALL_SUBTABLES = 'all';
 
     /**
+     * @var ArchiveTableStore
+     */
+    private $archiveTableStore;
+
+    /**
      * List of archive IDs for the site, periods and segment we are querying with.
      * Archive IDs are indexed by done flag and period, ie:
      *
@@ -184,6 +191,7 @@ class Archive
         $this->forceIndexedByDate = $forceIndexedByDate;
 
         $this->invalidator = StaticContainer::get('Piwik\Archive\ArchiveInvalidator');
+        $this->archiveTableStore = new ArchiveTableStore();
     }
 
     /**
@@ -289,7 +297,69 @@ class Archive
      */
     public function getNumeric($names)
     {
-        $data = $this->get($names, 'numeric');
+        if (!is_array($names)) {
+            $names = array($names);
+        }
+
+        $data = new Archive\DataCollection(
+            $names, 'numeric', $this->params->getIdSites(), $this->params->getPeriods(), $defaultRow = null);
+
+        $shouldUseCachedRecords = !Rules::isArchivingDisabledFor($this->params->getIdSites(), $this->params->getSegment(), $this->getPeriodLabel());
+        if (!$shouldUseCachedRecords) {
+            $recordData = $this->archiveTableStore->fetchMultiple($this->params, $names, $recordType = ArchiveTableStore::NUMERIC_RECORD_TYPE);
+            foreach ($recordData as $record) {
+                $data->set($record['idsite'], $record['period'], $record['name'], $record['value']);
+            }
+        }
+
+        $this->invalidatedReportsIfNeeded();
+        $today = Date::today();
+
+        $idArchives = [];
+
+        foreach ($this->params->getPeriods() as $period) {
+            $dateRange = $period->getRangeString();
+
+            $twoDaysBeforePeriod = $period->getDateStart()->subDay(2);
+            $twoDaysAfterPeriod = $period->getDateEnd()->addDay(2);
+
+            foreach ($this->params->getIdSites() as $idSite) {
+                if ($data->has($idSite, $dateRange)) {
+                    continue;
+                }
+
+                $site = new Site($idSite);
+
+                // if the END of the period is BEFORE the website creation date
+                // we already know there are no stats for this period
+                // we add one day to make sure we don't miss the day of the website creation
+                if ($twoDaysAfterPeriod->isEarlier($site->getCreationDate())) {
+                    Log::debug("Archive site %s, %s (%s) skipped, archive is before the website was created.",
+                        $idSite, $period->getLabel(), $period->getPrettyString());
+                    continue;
+                }
+
+                // if the starting date is in the future we know there is no visiidsite = ?t
+                if ($twoDaysBeforePeriod->isLater($today)) {
+                    Log::debug("Archive site %s, %s (%s) skipped, archive is after today.",
+                        $idSite, $period->getLabel(), $period->getPrettyString());
+                    continue;
+                }
+
+                $archiveGroups = $this->getArchiveGroupsForRecordNames($names);
+
+                if (empty($idArchives[$dateRange])) {
+                    $idArchives[$dateRange] = [];
+                }
+
+                $idArchives[$dateRange] = array_merge($idArchives[$dateRange], $this->prepareArchive($archiveGroups, $site, $period));
+            }
+        }
+
+        $recordData = $this->archiveTableStore->fetchMultipleByIdArchive($idArchives, $names, ArchiveTableStore::NUMERIC_RECORD_TYPE);
+        foreach ($recordData as $record) {
+            $data->set($record['idsite'], $record['date1'].','.$record['date2'], $record['name'], $record['value']);
+        }
 
         $resultIndices = $this->getResultIndices();
         $result = $data->getIndexedArray($resultIndices);
@@ -606,7 +676,7 @@ class Archive
      * query archive tables for IDs w/o launching archiving, or launch archiving and
      * get the idarchive from ArchiveProcessor instances.
      *
-     * @param string $archiveNames
+     * @param string[] $archiveNames
      * @return array
      */
     private function getArchiveIds($archiveNames)
@@ -641,7 +711,7 @@ class Archive
         // cache id archives for plugins we haven't processed yet
         if (!empty($archiveGroups)) {
             if (!Rules::isArchivingDisabledFor($this->params->getIdSites(), $this->params->getSegment(), $this->getPeriodLabel())) {
-                $this->cacheArchiveIdsAfterLaunching($archiveGroups, $plugins);
+                $this->cacheArchiveIdsAfterLaunching($archiveGroups);
             } else {
                 $this->cacheArchiveIdsWithoutLaunching($plugins);
             }
@@ -658,9 +728,8 @@ class Archive
      * metrics/reports have not been calculated/archived already.
      *
      * @param array $archiveGroups @see getArchiveGroupOfReport
-     * @param array $plugins List of plugin names to archive.
      */
-    private function cacheArchiveIdsAfterLaunching($archiveGroups, $plugins)
+    private function cacheArchiveIdsAfterLaunching($archiveGroups)
     {
         $this->invalidatedReportsIfNeeded();
 
@@ -838,7 +907,7 @@ class Archive
      * @throws \Exception If a plugin cannot be found or if the plugin for the report isn't
      *                    activated.
      */
-    private static function getPluginForReport($report)
+    public static function getPluginForReport($report)
     {
         // Core metrics are always processed in Core, for the requested date/period/segment
         if (in_array($report, Metrics::getVisitsMetricNames())) {
@@ -875,16 +944,19 @@ class Archive
         $idSites = array($site->getId());
         
         // process for each plugin as well
+        $idArchives = [];
         foreach ($archiveGroups as $plugin) {
             $doneFlag = $this->getDoneStringForPlugin($plugin, $idSites);
             $this->initializeArchiveIdCache($doneFlag);
 
             $idArchive = $archiveLoader->prepareArchive($plugin);
+            $idArchives[] = $idArchive;
 
             if ($idArchive) {
                 $this->idarchives[$doneFlag][$periodString][] = $idArchive;
             }
         }
+        return $idArchives;
     }
 
     private function getIdArchivesByMonth($doneFlags)
@@ -913,5 +985,35 @@ class Archive
     public static function clearStaticCache()
     {
         self::$cache = null;
+    }
+
+    private function getArchiveGroupsForRecordNames($names)
+    {
+        $plugins = $this->getRequestedPlugins($names);
+
+        // figure out which archives haven't been processed (if an archive has been processed,
+        // then we have the archive IDs in $this->idarchives)
+        $doneFlags     = array();
+        $archiveGroups = array();
+        foreach ($plugins as $plugin) {
+            $doneFlag = $this->getDoneStringForPlugin($plugin, $this->params->getIdSites());
+
+            $doneFlags[$doneFlag] = true;
+            if (!isset($this->idarchives[$doneFlag])) {
+                $archiveGroup = $this->getArchiveGroupOfPlugin($plugin);
+
+                if ($archiveGroup == self::ARCHIVE_ALL_PLUGINS_FLAG) {
+                    $archiveGroup = reset($plugins);
+                }
+                $archiveGroups[] = $archiveGroup;
+            }
+
+            $globalDoneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($this->params->getSegment());
+            if ($globalDoneFlag !== $doneFlag) {
+                $doneFlags[$globalDoneFlag] = true;
+            }
+        }
+
+        return array_unique($archiveGroups);
     }
 }
