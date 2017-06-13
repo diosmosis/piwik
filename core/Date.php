@@ -967,6 +967,6 @@ class Date
     private static function getInvalidDateFormatException($dateString)
     {
         $message = Piwik::translate('General_ExceptionInvalidDateFormat', array("YYYY-MM-DD, or 'today' or 'yesterday'", "strtotime", "http://php.net/strtotime"));
-        return new Exception($message . ": $dateString");
+        return new Exception($message . ": '$dateString'");
     }
 }
