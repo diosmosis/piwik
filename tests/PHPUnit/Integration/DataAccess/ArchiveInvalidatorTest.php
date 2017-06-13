@@ -599,13 +599,13 @@ class ArchiveInvalidatorTest extends IntegrationTestCase
 
         $doneFlag = 'done';
         if ($idArchive % 5 == 1) {
-            $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins(self::$segment1);
+            $doneFlag = Rules::getDoneFlagPrefix(self::$segment1);
         } else if ($idArchive % 5 == 2) {
             $doneFlag .= '.VisitsSummary';
         } else if ($idArchive % 5 == 3) {
             $doneFlag = Rules::getDoneFlagArchiveContainsOnePlugin(self::$segment1, 'UserCountry');
         } else if ($idArchive % 5 == 4) {
-            $doneFlag = Rules::getDoneFlagArchiveContainsAllPlugins(self::$segment2);
+            $doneFlag = Rules::getDoneFlagPrefix(self::$segment2);
         }
 
         $sql = "INSERT INTO $table (idarchive, name, idsite, date1, date2, period, ts_archived)

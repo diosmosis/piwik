@@ -49,10 +49,7 @@ class Rules
      */
     public static function getDoneStringFlagFor(array $idSites, $segment, $periodLabel, $plugin)
     {
-        if (!self::shouldProcessReportsAllPlugins($idSites, $segment, $periodLabel)) {
-            return self::getDoneFlagArchiveContainsOnePlugin($segment, $plugin);
-        }
-        return self::getDoneFlagArchiveContainsAllPlugins($segment);
+        return self::getDoneFlagArchiveContainsOnePlugin($segment, $plugin);
     }
 
     public static function shouldProcessReportsAllPlugins(array $idSites, Segment $segment, $periodLabel)
@@ -83,10 +80,10 @@ class Rules
 
     public static function getDoneFlagArchiveContainsOnePlugin(Segment $segment, $plugin)
     {
-        return 'done' . $segment->getHash() . '.' . $plugin ;
+        return self::getDoneFlagPrefix($segment) . '.' . $plugin ;
     }
 
-    public static function getDoneFlagArchiveContainsAllPlugins(Segment $segment)
+    public static function getDoneFlagPrefix(Segment $segment)
     {
         return 'done' . $segment->getHash();
     }
@@ -101,8 +98,6 @@ class Rules
     public static function getDoneFlags(array $plugins, Segment $segment)
     {
         $doneFlags = array();
-        $doneAllPlugins = self::getDoneFlagArchiveContainsAllPlugins($segment);
-        $doneFlags[$doneAllPlugins] = $doneAllPlugins;
 
         $plugins = array_unique($plugins);
         foreach ($plugins as $plugin) {

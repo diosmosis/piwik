@@ -136,7 +136,7 @@ class Model
         }
 
         if ($segment) {
-            $nameCondition = "name LIKE '" . Rules::getDoneFlagArchiveContainsAllPlugins($segment) . "%'";
+            $nameCondition = "name LIKE '" . Rules::getDoneFlagPrefix($segment) . "%'";
         } else {
             $nameCondition = "name LIKE 'done%'";
         }
