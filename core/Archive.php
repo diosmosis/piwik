@@ -108,7 +108,6 @@ use Piwik\Period\Factory as PeriodFactory;
 class Archive
 {
     const REQUEST_ALL_WEBSITES_FLAG = 'all';
-    const ARCHIVE_ALL_PLUGINS_FLAG = 'all';
     const ID_SUBTABLE_LOAD_ALL_SUBTABLES = 'all';
 
     /**

@@ -74,16 +74,7 @@ class ArchiveTableStore
             $doneFlags[$doneFlag] = true;
 
             $archiveGroup = $this->getArchiveGroupOfPlugin($params, $plugin);
-
-            if ($archiveGroup == Archive::ARCHIVE_ALL_PLUGINS_FLAG) {
-                $archiveGroup = reset($plugins);
-            }
             $archiveGroups[] = $archiveGroup;
-
-            $globalDoneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($params->getSegment());
-            if ($globalDoneFlag !== $doneFlag) {
-                $doneFlags[$globalDoneFlag] = true;
-            }
         }
 
         $archiveGroups = array_unique($archiveGroups);
@@ -232,14 +223,7 @@ class ArchiveTableStore
      */
     private function getArchiveGroupOfPlugin(Parameters $params, $plugin)
     {
-        $periods = $params->getPeriods();
-        $periodLabel = reset($periods)->getLabel();
-
-        if (Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $periodLabel)) {
-            return Archive::ARCHIVE_ALL_PLUGINS_FLAG;
-        }
-
-        return $plugin;
+        return $plugin; // TODO: remove this function if all this works
     }
 
     private function getSiteIdsThatAreRequestedInThisArchiveButWereNotInvalidatedYet(Parameters $params)
