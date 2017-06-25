@@ -9,8 +9,6 @@
 
 namespace Piwik\Archive;
 
-
-use Piwik\Archive;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\ArchiveProcessor\Parameters as ArchiveProcessorParams;
 use Piwik\Cache\Transient;
@@ -59,43 +57,18 @@ class ArchiveTableStore
     public function getArchiveIds(Parameters $params, $archiveNames)
     {
         $plugins = $this->getRequestedPlugins($archiveNames);
-
-        // figure out which archives haven't been processed (if an archive has been processed,
-        // then we have the archive IDs in $this->idarchives)
-        $doneFlags     = array();
-        $archiveGroups = array();
-        foreach ($plugins as $plugin) {
-            $doneFlag = $this->getDoneStringForPlugin($params, $plugin, $params->getIdSites());
-
-            $doneFlags[$doneFlag] = true;
-
-            $archiveGroup = $this->getArchiveGroupOfPlugin($params, $plugin);
-
-            if ($archiveGroup == Archive::ARCHIVE_ALL_PLUGINS_FLAG) {
-                $archiveGroup = reset($plugins);
-            }
-            $archiveGroups[] = $archiveGroup;
-
-            $globalDoneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($params->getSegment());
-            if ($globalDoneFlag !== $doneFlag) {
-                $doneFlags[$globalDoneFlag] = true;
-            }
+        if (empty($plugins)) {
+            return [];
         }
-
-        $archiveGroups = array_unique($archiveGroups);
 
         // cache id archives for plugins we haven't processed yet
-        if (!empty($archiveGroups)) {
-            if (!Rules::isArchivingDisabledFor($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
-                $this->cacheArchiveIdsAfterLaunching($params, $archiveGroups);
-            } else {
-                $this->cacheArchiveIdsWithoutLaunching($params, $plugins);
-            }
+        if (!Rules::isArchivingDisabledFor($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
+            $this->cacheArchiveIdsAfterLaunching($params, $plugins);
+        } else {
+            $this->cacheArchiveIdsWithoutLaunching($params, $plugins);
         }
 
-        $idArchivesByMonth = $this->getIdArchivesByMonth($params, $doneFlags);
-
-        return $idArchivesByMonth;
+        return $this->getIdArchivesByMonth($params, $plugins);
     }
 
     public function getArchiveData(array $archiveIds, array $archiveNames, $archiveDataType, $idSubtable = null)
@@ -137,11 +110,16 @@ class ArchiveTableStore
      * This function will launch the archiving process for each period/site/plugin if
      * metrics/reports have not been calculated/archived already.
      *
-     * @param array $archiveGroups @see getArchiveGroupOfReport
+     * @param Parameters $params
      * @param array $plugins List of plugin names to archive.
      */
-    private function cacheArchiveIdsAfterLaunching(Parameters $params, $archiveGroups)
+    private function cacheArchiveIdsAfterLaunching(Parameters $params, $plugins)
     {
+        // if Loader is going to process every plugin at once, just use Loader w/ the first plugin
+        if (Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
+            $plugins = [reset($plugins)];
+        }
+
         $this->invalidatedReportsIfNeeded($params);
 
         $today = Date::today();
@@ -170,7 +148,7 @@ class ArchiveTableStore
                     continue;
                 }
 
-                $this->prepareArchive($params, $archiveGroups, $site, $period);
+                $this->prepareArchive($params, $plugins, $site, $period);
             }
         }
     }
@@ -197,13 +175,7 @@ class ArchiveTableStore
         }
     }
 
-
-    /**
-     * @param $archiveGroups
-     * @param $site
-     * @param $period
-     */
-    private function prepareArchive(Parameters $params, array $archiveGroups, Site $site, Period $period)
+    private function prepareArchive(Parameters $params, array $plugins, Site $site, Period $period)
     {
         $parameters = new \Piwik\ArchiveProcessor\Parameters($site, $period, $params->getSegment());
         $archiveLoader = new \Piwik\ArchiveProcessor\Loader($parameters, $this);
@@ -213,7 +185,7 @@ class ArchiveTableStore
         $idSite = $site->getId();
 
         // process for each plugin as well
-        foreach ($archiveGroups as $plugin) {
+        foreach ($plugins as $plugin) {
             $doneFlag = $this->getDoneStringForPlugin($params, $plugin, [$idSite]);
             if ($this->idArchiveCache->has($idSite, $periodString, $doneFlag)) {
                 continue;
@@ -224,12 +196,19 @@ class ArchiveTableStore
         }
     }
 
-    private function getIdArchivesByMonth(Parameters $params, $doneFlags)
+    private function getIdArchivesByMonth(Parameters $params, $plugins)
     {
+        // get done flags of archives to look for. these done flags are used to access the idarchive cache.
+        $doneFlags = array_map(function ($plugin) use ($params) {
+            return $this->getDoneStringForPlugin($params, $plugin, $params->getIdSites());
+        }, $plugins);
+        $doneFlags[] = Rules::getDoneFlagArchiveContainsAllPlugins($params->getSegment());
+        $doneFlags = array_unique($doneFlags);
+
         // order idarchives by the table month they belong to
         $idArchivesByMonth = array();
 
-        foreach (array_keys($doneFlags) as $doneFlag) {
+        foreach ($doneFlags as $doneFlag) {
             foreach ($params->getPeriods() as $period) {
                 $dateRange = $period->getRangeString();
                 foreach ($params->getIdSites() as $idSite) {
@@ -241,30 +220,6 @@ class ArchiveTableStore
         }
 
         return $idArchivesByMonth;
-    }
-
-    /**
-     * Returns the archiving group identifier given a plugin.
-     *
-     * More than one plugin can be called at once when archiving. In such a case
-     * we don't want to launch archiving three times for three plugins if doing
-     * it once is enough, so getArchiveIds makes sure to get the archive group of
-     * all reports.
-     *
-     * If the period isn't a range, then all plugins' archiving code is executed.
-     * If the period is a range, then archiving code is executed individually for
-     * each plugin.
-     */
-    private function getArchiveGroupOfPlugin(Parameters $params, $plugin)
-    {
-        $periods = $params->getPeriods();
-        $periodLabel = reset($periods)->getLabel();
-
-        if (Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $periodLabel)) {
-            return Archive::ARCHIVE_ALL_PLUGINS_FLAG;
-        }
-
-        return $plugin;
     }
 
     private function getSiteIdsThatAreRequestedInThisArchiveButWereNotInvalidatedYet(Parameters $params)
@@ -371,9 +326,12 @@ class ArchiveTableStore
         }
         return $plugin;
     }
+
     /**
      * Returns the done string flag for a plugin using this instance's segment & periods.
+     * @param Parameters $params
      * @param string $plugin
+     * @param $idSites
      * @return string
      */
     private function getDoneStringForPlugin(Parameters $params, $plugin, $idSites)
