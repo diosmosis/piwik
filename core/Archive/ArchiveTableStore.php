@@ -9,6 +9,7 @@
 
 namespace Piwik\Archive;
 
+use Piwik\Archive;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\ArchiveProcessor\Parameters as ArchiveProcessorParams;
 use Piwik\Cache\Transient;
@@ -70,12 +71,25 @@ class ArchiveTableStore
             $this->cacheArchiveIdsWithoutLaunching($params, $plugins);
         }
 
-        return $this->getIdArchivesByMonth($params, $plugins);
+        return $this->getIdArchivesFromCache($params, $plugins);
     }
 
     public function getArchiveData(array $archiveIds, array $archiveNames, $archiveDataType, $idSubtable = null)
     {
-        return ArchiveSelector::getArchiveData($archiveIds, $archiveNames, $archiveDataType, $idSubtable);
+        $archiveIdsByDateRange = [];
+        foreach ($archiveIds as $idSite => $archiveIdsByPeriod) {
+            foreach ($archiveIdsByPeriod as $dateRange => $archiveIdsBySegmentHash) {
+                if (!isset($archiveIdsByDateRange[$dateRange])) {
+                    $archiveIdsByDateRange[$dateRange] = [];
+                }
+
+                foreach ($archiveIdsBySegmentHash as $segmentHash => $archiveIdsForPermutation) {
+                    $archiveIdsByDateRange[$dateRange] = array_merge($archiveIdsByDateRange[$dateRange], $archiveIdsForPermutation);
+                }
+            }
+        }
+
+        return ArchiveSelector::getArchiveData($archiveIdsByDateRange, $archiveNames, $archiveDataType, $idSubtable);
     }
 
     public function getArchiveIdAndVisits(ArchiveProcessorParams $params, $minDatetimeArchiveProcessedUTC)
@@ -118,7 +132,8 @@ class ArchiveTableStore
     private function cacheArchiveIdsAfterLaunching(Parameters $params, $plugins)
     {
         // if Loader is going to process every plugin at once, just use Loader w/ the first plugin
-        if (Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
+        $isArchivingAllPlugins = Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel());
+        if ($isArchivingAllPlugins) {
             $plugins = [reset($plugins)];
         }
 
@@ -148,7 +163,7 @@ class ArchiveTableStore
                     continue;
                 }
 
-                $this->prepareArchive($params, $plugins, $site, $period);
+                $this->prepareArchive($params, $plugins, $site, $period, $isArchivingAllPlugins);
             }
         }
     }
@@ -166,16 +181,30 @@ class ArchiveTableStore
         $idarchivesByReport = ArchiveSelector::getArchiveIds(
             $params->getIdSites(), $params->getPeriods(), $params->getSegment(), $plugins);
 
+        $segmentHash = $params->getSegment()->getHash();
+
         foreach ($idarchivesByReport as $doneFlag => $idarchivesByDate) {
             foreach ($idarchivesByDate as $dateRange => $idArchives) {
                 foreach ($idArchives as $idSite => $idArchive) {
-                    $this->idArchiveCache->set($idSite, $dateRange, $doneFlag, $idArchive);
+                    $plugin = $this->getPluginFromDoneFlag($doneFlag, $segmentHash);
+                    $this->idArchiveCache->set($idSite, $dateRange, $segmentHash, $plugin, $idArchive);
                 }
             }
         }
     }
 
-    private function prepareArchive(Parameters $params, array $plugins, Site $site, Period $period)
+    // hack required since the concept of an "archive group" exists in the database data and not just in the algorithm
+    // TODO: move to Rules & unit test
+    private function getPluginFromDoneFlag($doneFlag, $segmentHash)
+    {
+        $rest = substr($doneFlag, strlen(Rules::DONE_FLAG_PREFIX));
+        if ($segmentHash !== '') {
+            $rest = substr($rest, strlen($segmentHash));
+        }
+        return empty($rest) ? Archive::ARCHIVE_ALL_PLUGINS_FLAG : $rest;
+    }
+
+    private function prepareArchive(Parameters $params, array $plugins, Site $site, Period $period, $isArchivingAllPlugins)
     {
         $parameters = new \Piwik\ArchiveProcessor\Parameters($site, $period, $params->getSegment());
         $archiveLoader = new \Piwik\ArchiveProcessor\Loader($parameters, $this);
@@ -183,42 +212,40 @@ class ArchiveTableStore
         $periodString = $period->getRangeString();
 
         $idSite = $site->getId();
+        $segmentHash = $params->getSegment()->getHash();
 
         // process for each plugin as well
         foreach ($plugins as $plugin) {
-            $doneFlag = $this->getDoneStringForPlugin($params, $plugin, [$idSite]);
-            if ($this->idArchiveCache->has($idSite, $periodString, $doneFlag)) {
+            $archiveGroup = $isArchivingAllPlugins ? Archive::ARCHIVE_ALL_PLUGINS_FLAG : $plugin;
+            if ($this->idArchiveCache->has($idSite, $periodString, $segmentHash, $archiveGroup)) {
                 continue;
             }
 
             $idArchive = $archiveLoader->prepareArchive($plugin);
-            $this->idArchiveCache->set($idSite, $periodString, $doneFlag, $idArchive);
+            $this->idArchiveCache->set($idSite, $periodString, $segmentHash, $archiveGroup, $idArchive);
         }
     }
 
-    private function getIdArchivesByMonth(Parameters $params, $plugins)
+    private function getIdArchivesFromCache(Parameters $params, $plugins)
     {
-        // get done flags of archives to look for. these done flags are used to access the idarchive cache.
-        $doneFlags = array_map(function ($plugin) use ($params) {
-            return $this->getDoneStringForPlugin($params, $plugin, $params->getIdSites());
-        }, $plugins);
-        $doneFlags[] = Rules::getDoneFlagArchiveContainsAllPlugins($params->getSegment());
-        $doneFlags = array_unique($doneFlags);
+        $segmentHash = $params->getSegment()->getHash();
+        $plugins[] = Archive::ARCHIVE_ALL_PLUGINS_FLAG;
 
         // order idarchives by the table month they belong to
         $idArchivesByMonth = array();
-
-        foreach ($doneFlags as $doneFlag) {
+        foreach ($plugins as $plugin) {
             foreach ($params->getPeriods() as $period) {
                 $dateRange = $period->getRangeString();
                 foreach ($params->getIdSites() as $idSite) {
-                    if ($this->idArchiveCache->hasNonEmpty($idSite, $dateRange, $doneFlag)) {
-                        $idArchivesByMonth[$dateRange][] = $this->idArchiveCache->get($idSite, $dateRange, $doneFlag);
+                    if (!$this->idArchiveCache->hasNonEmpty($idSite, $dateRange, $segmentHash, $plugin)) {
+                        continue;
                     }
+
+                    $idArchivesByMonth[$idSite][$dateRange][$segmentHash][] =
+                        $this->idArchiveCache->get($idSite, $dateRange, $segmentHash, $plugin);
                 }
             }
         }
-
         return $idArchivesByMonth;
     }
 
@@ -325,17 +352,5 @@ class ArchiveTableStore
                 . " (Plugin '$plugin' is not activated.)");
         }
         return $plugin;
-    }
-
-    /**
-     * Returns the done string flag for a plugin using this instance's segment & periods.
-     * @param Parameters $params
-     * @param string $plugin
-     * @param $idSites
-     * @return string
-     */
-    private function getDoneStringForPlugin(Parameters $params, $plugin, $idSites)
-    {
-        return Rules::getDoneStringFlagFor($idSites, $params->getSegment(), $params->getPeriodLabel(), $plugin);
     }
 }

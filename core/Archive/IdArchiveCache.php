@@ -44,9 +44,9 @@ class IdArchiveCache
      */
     private $idArchives = [];
 
-    public function has($idSite, $dateRange, $doneFlag)
+    public function has($idSite, $dateRange, $segmentHash, $plugin)
     {
-        return isset($this->idArchives[$idSite][$dateRange][$doneFlag]);
+        return isset($this->idArchives[$idSite][$dateRange][$segmentHash][$plugin]);
     }
 
     /**
@@ -55,19 +55,19 @@ class IdArchiveCache
      *
      * @return bool
      */
-    public function hasNonEmpty($idSite, $dateRange, $doneFlag)
+    public function hasNonEmpty($idSite, $dateRange, $segmentHash, $plugin)
     {
-        return !empty($this->idArchives[$idSite][$dateRange][$doneFlag]);
+        return !empty($this->idArchives[$idSite][$dateRange][$segmentHash][$plugin]);
     }
 
-    public function get($idSite, $dateRange, $doneFlag)
+    public function get($idSite, $dateRange, $segmentHash, $plugin)
     {
-        return $this->idArchives[$idSite][$dateRange][$doneFlag];
+        return $this->idArchives[$idSite][$dateRange][$segmentHash][$plugin];
     }
 
-    public function set($idSite, $dateRange, $doneFlag, $idArchive)
+    public function set($idSite, $dateRange, $segmentHash, $plugin, $idArchive)
     {
-        $this->idArchives[$idSite][$dateRange][$doneFlag] = $idArchive;
+        $this->idArchives[$idSite][$dateRange][$segmentHash][$plugin] = $idArchive;
     }
 
     public function flushBySite(array $idSites)
