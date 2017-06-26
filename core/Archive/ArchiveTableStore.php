@@ -61,6 +61,8 @@ class ArchiveTableStore
             return [];
         }
 
+        $this->invalidatedReportsIfNeeded($params);
+
         // cache id archives for plugins we haven't processed yet
         if (!Rules::isArchivingDisabledFor($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
             $this->cacheArchiveIdsAfterLaunching($params, $plugins);
@@ -119,8 +121,6 @@ class ArchiveTableStore
         if (Rules::shouldProcessReportsAllPlugins($params->getIdSites(), $params->getSegment(), $params->getPeriodLabel())) {
             $plugins = [reset($plugins)];
         }
-
-        $this->invalidatedReportsIfNeeded($params);
 
         $today = Date::today();
 
