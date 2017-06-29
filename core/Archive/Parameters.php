@@ -56,4 +56,9 @@ class Parameters
     {
         return $this->idSites;
     }
+
+    public function getPeriodLabel()
+    {
+        return reset($this->periods)->getLabel();
+    }
 }

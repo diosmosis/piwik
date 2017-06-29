@@ -591,43 +591,17 @@ class Archive
     private function getArchiveIds($archiveNames)
     {
         $plugins = $this->getRequestedPlugins($archiveNames);
-
-        // figure out which archives haven't been processed (if an archive has been processed,
-        // then we have the archive IDs in $this->idarchives)
-        $doneFlags     = array();
-        $archiveGroups = array();
-        foreach ($plugins as $plugin) {
-            $doneFlag = $this->getDoneStringForPlugin($plugin, $this->params->getIdSites());
-
-            $doneFlags[$doneFlag] = true;
-
-            $archiveGroup = $this->getArchiveGroupOfPlugin($plugin);
-
-            if ($archiveGroup == self::ARCHIVE_ALL_PLUGINS_FLAG) {
-                $archiveGroup = reset($plugins);
-            }
-            $archiveGroups[] = $archiveGroup;
-
-            $globalDoneFlag = Rules::getDoneFlagArchiveContainsAllPlugins($this->params->getSegment());
-            if ($globalDoneFlag !== $doneFlag) {
-                $doneFlags[$globalDoneFlag] = true;
-            }
+        if (empty($plugins)) {
+            return [];
         }
 
-        $archiveGroups = array_unique($archiveGroups);
-
-        // cache id archives for plugins we haven't processed yet
-        if (!empty($archiveGroups)) {
-            if (!Rules::isArchivingDisabledFor($this->params->getIdSites(), $this->params->getSegment(), $this->getPeriodLabel())) {
-                $this->cacheArchiveIdsAfterLaunching($archiveGroups);
-            } else {
-                $this->cacheArchiveIdsWithoutLaunching($plugins);
-            }
+        if (!Rules::isArchivingDisabledFor($this->params->getIdSites(), $this->params->getSegment(), $this->params->getPeriodLabel())) {
+            $this->cacheArchiveIdsAfterLaunching($plugins);
+        } else {
+            $this->cacheArchiveIdsWithoutLaunching($plugins);
         }
 
-        $idArchivesByMonth = $this->getIdArchivesByMonth($doneFlags);
-
-        return $idArchivesByMonth;
+        return $this->getIdArchivesByMonth($plugins);
     }
 
     /**
@@ -635,11 +609,17 @@ class Archive
      * This function will launch the archiving process for each period/site/plugin if
      * metrics/reports have not been calculated/archived already.
      *
-     * @param array $archiveGroups @see getArchiveGroupOfReport
      * @param array $plugins List of plugin names to archive.
      */
-    private function cacheArchiveIdsAfterLaunching($archiveGroups)
+    private function cacheArchiveIdsAfterLaunching($plugins)
     {
+        // if Loader is going to process every plugin at once, just use Loader w/ the first plugin
+        $isArchivingAllPlugins = Rules::shouldProcessReportsAllPlugins($this->params->getIdSites(),
+            $this->params->getSegment(), $this->params->getPeriodLabel());
+        if ($isArchivingAllPlugins) {
+            $plugins = [reset($plugins)];
+        }
+
         $this->invalidatedReportsIfNeeded();
 
         $today = Date::today();
@@ -667,7 +647,7 @@ class Archive
                     continue;
                 }
 
-                $this->prepareArchive($archiveGroups, $site, $period);
+                $this->prepareArchive($plugins, $site, $period);
             }
         }
     }
@@ -704,15 +684,9 @@ class Archive
         return Rules::getDoneStringFlagFor(
                     $idSites,
                     $this->params->getSegment(),
-                    $this->getPeriodLabel(),
+                    $this->params->getPeriodLabel(),
                     $plugin
         );
-    }
-
-    private function getPeriodLabel()
-    {
-        $periods = $this->params->getPeriods();
-        return reset($periods)->getLabel();
     }
 
     /**
@@ -757,30 +731,6 @@ class Archive
     }
 
     /**
-     * Returns the archiving group identifier given a plugin.
-     *
-     * More than one plugin can be called at once when archiving. In such a case
-     * we don't want to launch archiving three times for three plugins if doing
-     * it once is enough, so getArchiveIds makes sure to get the archive group of
-     * all reports.
-     *
-     * If the period isn't a range, then all plugins' archiving code is executed.
-     * If the period is a range, then archiving code is executed individually for
-     * each plugin.
-     */
-    private function getArchiveGroupOfPlugin($plugin)
-    {
-        $periods = $this->params->getPeriods();
-        $periodLabel = reset($periods)->getLabel();
-        
-        if (Rules::shouldProcessReportsAllPlugins($this->params->getIdSites(), $this->params->getSegment(), $periodLabel)) {
-            return self::ARCHIVE_ALL_PLUGINS_FLAG;
-        }
-
-        return $plugin;
-    }
-
-    /**
      * Returns the name of the plugin that archives a given report.
      *
      * @param string $report Archive data name, eg, `'nb_visits'`, `'DevicesDetection_...'`, etc.
@@ -815,7 +765,7 @@ class Archive
      * @param $site
      * @param $period
      */
-    private function prepareArchive(array $archiveGroups, Site $site, Period $period)
+    private function prepareArchive(array $plugins, Site $site, Period $period)
     {
         $parameters = new ArchiveProcessor\Parameters($site, $period, $this->params->getSegment());
         $archiveLoader = new ArchiveProcessor\Loader($parameters);
@@ -825,7 +775,7 @@ class Archive
         $idSite = $site->getId();
         
         // process for each plugin as well
-        foreach ($archiveGroups as $plugin) {
+        foreach ($plugins as $plugin) {
             $doneFlag = $this->getDoneStringForPlugin($plugin, [$idSite]);
             if ($this->idArchiveCahe->has($idSite, $periodString, $doneFlag)) {
                 continue;
@@ -836,12 +786,19 @@ class Archive
         }
     }
 
-    private function getIdArchivesByMonth($doneFlags)
+    private function getIdArchivesByMonth($plugins)
     {
+        // get done flags of archives to look for. these done flags are used to access the idarchive cache.
+        $doneFlags = array_map(function ($plugin) {
+            return $this->getDoneStringForPlugin($plugin, $this->params->getIdSites());
+        }, $plugins);
+        $doneFlags[] = Rules::getDoneFlagArchiveContainsAllPlugins($this->params->getSegment());
+        $doneFlags = array_unique($doneFlags);
+
         // order idarchives by the table month they belong to
         $idArchivesByMonth = array();
 
-        foreach (array_keys($doneFlags) as $doneFlag) {
+        foreach ($doneFlags as $doneFlag) {
             foreach ($this->params->getPeriods() as $period) {
                 $dateRange = $period->getRangeString();
                 foreach ($this->params->getIdSites() as $idSite) {
