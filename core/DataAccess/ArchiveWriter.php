@@ -13,6 +13,7 @@ use Piwik\Archive;
 use Piwik\Archive\Chunk;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\ArchiveProcessor;
+use Piwik\Container\StaticContainer;
 use Piwik\Db;
 use Piwik\Db\BatchInsert;
 use Piwik\Period;
@@ -67,6 +68,7 @@ class ArchiveWriter
         $this->idSite    = $params->getSite()->getId();
         $this->segment   = $params->getSegment();
         $this->period    = $params->getPeriod();
+        $this->plugin = $params->getRequestedPlugin();
 
         $idSites = array($this->idSite);
         $this->doneFlag = Rules::getDoneStringFlagFor($idSites, $this->segment, $this->period->getLabel(), $params->getRequestedPlugin());
@@ -172,6 +174,9 @@ class ArchiveWriter
         }
 
         $this->insertRecord($this->doneFlag, $status);
+
+        StaticContainer::get(Archive\IdArchiveCache::class)->set($this->idSite, $this->period->getRangeString(),
+            $this->segment->getHash(), $this->plugin, $this->getIdArchive());
     }
 
     protected function insertBulkRecords($records)

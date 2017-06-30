@@ -34,6 +34,8 @@ class Rules
 
     const FLAG_TABLE_PURGED = 'lastPurge_';
 
+    const DONE_FLAG_PREFIX = 'done';
+
     /** Flag that will forcefully disable the archiving process (used in tests only) */
     public static $archivingDisabledByTests = false;
 
@@ -83,12 +85,12 @@ class Rules
 
     public static function getDoneFlagArchiveContainsOnePlugin(Segment $segment, $plugin)
     {
-        return 'done' . $segment->getHash() . '.' . $plugin ;
+        return self::DONE_FLAG_PREFIX . $segment->getHash() . '.' . $plugin ;
     }
 
     public static function getDoneFlagArchiveContainsAllPlugins(Segment $segment)
     {
-        return 'done' . $segment->getHash();
+        return self::DONE_FLAG_PREFIX . $segment->getHash();
     }
 
     /**
