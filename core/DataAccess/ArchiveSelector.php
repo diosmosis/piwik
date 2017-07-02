@@ -70,7 +70,7 @@ class ArchiveSelector
         $results = self::getModel()->getArchiveIdAndVisits($numericTable, $idSite, $period, $dateStartIso, $dateEndIso, $minDatetimeIsoArchiveProcessedUTC, $doneFlags, $doneFlagValues);
 
         if (empty($results)) {
-            return false;
+            return [false, false, false];
         }
 
         $idArchive = self::getMostRecentIdArchiveFromResults($segment, $requestedPlugin, $results);
@@ -80,7 +80,7 @@ class ArchiveSelector
         list($visits, $visitsConverted) = self::getVisitsMetricsFromResults($idArchive, $idArchiveVisitsSummary, $results);
 
         if (false === $visits && false === $idArchive) {
-            return false;
+            return [false, false, false];
         }
 
         return array($idArchive, $visits, $visitsConverted);
@@ -209,7 +209,7 @@ class ArchiveSelector
                 //FIXMEA duplicate with Archive.php
                 $dateStr = $row['date1'] . ',' . $row['date2'];
 
-                $result[$row['name']][$dateStr][$row['idsite']] = $row['idarchive'];
+                $result[$row['idsite']][$dateStr][$row['name']] = $row['idarchive'];
             }
         }
 

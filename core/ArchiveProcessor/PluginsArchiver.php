@@ -145,7 +145,7 @@ class PluginsArchiver
                         $pluginName,
                         $this->params->getSegment() ? sprintf("(for segment = '%s')", $this->params->getSegment()->getString()) : ''
                     );
-                } catch (Exception $e) {
+                } catch (Exception $e) {throw $e;
                     $className = get_class($e);
                     $exception = new $className($e->getMessage() . " - caused by plugin $pluginName", $e->getCode(), $e);
 

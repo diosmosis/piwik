@@ -13,6 +13,7 @@ use Piwik\Archive;
 use Piwik\Archive\Chunk;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\ArchiveProcessor;
+use Piwik\Container\StaticContainer;
 use Piwik\Db;
 use Piwik\Db\BatchInsert;
 use Piwik\Period;
@@ -63,6 +64,7 @@ class ArchiveWriter
 
     public function __construct(ArchiveProcessor\Parameters $params, $isArchiveTemporary)
     {
+        $this->params = $params;
         $this->idArchive = false;
         $this->idSite    = $params->getSite()->getId();
         $this->segment   = $params->getSegment();
@@ -73,6 +75,8 @@ class ArchiveWriter
         $this->isArchiveTemporary = $isArchiveTemporary;
 
         $this->dateStart = $this->period->getDateStart();
+
+        $this->archiveDataStore = StaticContainer::get(Archive\ArchiveDataStore::class);
     }
 
     /**
@@ -85,36 +89,13 @@ class ArchiveWriter
      */
     public function insertBlobRecord($name, $values)
     {
-        if (is_array($values)) {
-            $clean = array();
-
-            if (isset($values[0])) {
-                // we always store the root table in a single blob for fast access
-                $clean[] = array($name, $this->compress($values[0]));
-                unset($values[0]);
-            }
-
-            if (!empty($values)) {
-                // we move all subtables into chunks
-                $chunk  = new Chunk();
-                $chunks = $chunk->moveArchiveBlobsIntoChunks($name, $values);
-                foreach ($chunks as $index => $subtables) {
-                    $clean[] = array($index, $this->compress(serialize($subtables)));
-                }
-            }
-
-            $this->insertBulkRecords($clean);
-            return;
-        }
-
-        $values = $this->compress($values);
-        $this->insertRecord($name, $values);
+        $this->archiveDataStore->setBlobRecord($this->params, $this->getIdArchive(), $name, $values);
     }
 
     public function getIdArchive()
     {
         if ($this->idArchive === false) {
-            throw new Exception("Must call allocateNewArchiveId() first");
+            throw new Exception("Must call initNewArchive() first");
         }
 
         return $this->idArchive;
@@ -122,48 +103,10 @@ class ArchiveWriter
 
     public function initNewArchive()
     {
-        $this->allocateNewArchiveId();
-        $this->logArchiveStatusAsIncomplete();
+        $this->idArchive = $this->archiveDataStore->startArchive($this->params);
     }
 
     public function finalizeArchive()
-    {
-        $numericTable = $this->getTableNumeric();
-        $idArchive    = $this->getIdArchive();
-
-        $this->getModel()->deletePreviousArchiveStatus($numericTable, $idArchive, $this->doneFlag);
-
-        $this->logArchiveStatusAsFinal();
-    }
-
-    protected function compress($data)
-    {
-        if (Db::get()->hasBlobDataType()) {
-            return gzcompress($data);
-        }
-
-        return $data;
-    }
-
-    protected function allocateNewArchiveId()
-    {
-        $numericTable = $this->getTableNumeric();
-
-        $this->idArchive = $this->getModel()->allocateNewArchiveId($numericTable);
-        return $this->idArchive;
-    }
-
-    private function getModel()
-    {
-        return new Model();
-    }
-
-    protected function logArchiveStatusAsIncomplete()
-    {
-        $this->insertRecord($this->doneFlag, self::DONE_ERROR);
-    }
-
-    protected function logArchiveStatusAsFinal()
     {
         $status = self::DONE_OK;
 
@@ -171,54 +114,11 @@ class ArchiveWriter
             $status = self::DONE_OK_TEMPORARY;
         }
 
-        $this->insertRecord($this->doneFlag, $status);
-    }
-
-    protected function insertBulkRecords($records)
-    {
-        // Using standard plain INSERT if there is only one record to insert
-        if ($DEBUG_DO_NOT_USE_BULK_INSERT = false
-            || count($records) == 1
-        ) {
-            foreach ($records as $record) {
-                $this->insertRecord($record[0], $record[1]);
-            }
-
-            return true;
-        }
-
-        $bindSql = $this->getInsertRecordBind();
-        $values  = array();
-
-        $valueSeen = false;
-        foreach ($records as $record) {
-            // don't record zero
-            if (empty($record[1])) {
-                continue;
-            }
-
-            $bind     = $bindSql;
-            $bind[]   = $record[0]; // name
-            $bind[]   = $record[1]; // value
-            $values[] = $bind;
-
-            $valueSeen = $record[1];
-        }
-
-        if (empty($values)) {
-            return true;
-        }
-
-        $tableName = $this->getTableNameToInsert($valueSeen);
-        $fields    = $this->getInsertFields();
-
-        BatchInsert::tableInsertBatch($tableName, $fields, $values, $throwException = false, $charset = 'latin1');
-
-        return true;
+        $this->archiveDataStore->finishArchive($this->params, $this->getIdArchive(), $status);
     }
 
     /**
-     * Inserts a record in the right table (either NUMERIC or BLOB)
+     * Inserts a numeric record in the numeric table.
      *
      * @param string $name
      * @param mixed $value
@@ -231,42 +131,14 @@ class ArchiveWriter
             return false;
         }
 
-        $tableName = $this->getTableNameToInsert($value);
-        $fields    = $this->getInsertFields();
-        $record    = $this->getInsertRecordBind();
-
-        $this->getModel()->insertRecord($tableName, $fields, $record, $name, $value);
+        $this->archiveDataStore->setNumericRecord($this->params, $this->getIdArchive(), $name, $value);
 
         return true;
-    }
-
-    protected function getInsertRecordBind()
-    {
-        return array($this->getIdArchive(),
-            $this->idSite,
-            $this->dateStart->toString('Y-m-d'),
-            $this->period->getDateEnd()->toString('Y-m-d'),
-            $this->period->getId(),
-            date("Y-m-d H:i:s"));
-    }
-
-    protected function getTableNameToInsert($value)
-    {
-        if (is_numeric($value)) {
-            return $this->getTableNumeric();
-        }
-
-        return ArchiveTableCreator::getBlobTable($this->dateStart);
     }
 
     protected function getTableNumeric()
     {
         return ArchiveTableCreator::getNumericTable($this->dateStart);
-    }
-
-    protected function getInsertFields()
-    {
-        return $this->fields;
     }
 
     protected function isRecordZero($value)

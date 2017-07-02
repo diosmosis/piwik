@@ -9,7 +9,7 @@
 namespace Piwik\ArchiveProcessor;
 
 use Piwik\Archive;
-use Piwik\Cache;
+use Piwik\Cache\Transient;
 use Piwik\Config;
 use Piwik\DataAccess\ArchiveSelector;
 use Piwik\Date;
@@ -40,9 +40,22 @@ class Loader
      */
     protected $params;
 
-    public function __construct(Parameters $params)
+    /**
+     * @var Archive\ArchiveDataStore
+     */
+    private $archiveDataStore;
+
+    /**
+     * @var Transient
+     */
+    private $transientCache;
+
+    public function __construct(Parameters $params, Archive\ArchiveDataStore $archiveDataStore,
+                                Transient $transientCache)
     {
         $this->params = $params;
+        $this->archiveDataStore = $archiveDataStore;
+        $this->transientCache = $transientCache;
     }
 
     /**
@@ -66,7 +79,7 @@ class Loader
         $this->params->setRequestedPlugin($pluginName);
 
         list($idArchive, $visits, $visitsConverted) = $this->loadExistingArchiveIdFromDb();
-        if (!empty($idArchive)) {
+        if (!empty($idArchive)) {// if idarchive is not false, just return it. will idarchive be false while visits isn't?
             return $idArchive;
         }
 
@@ -168,13 +181,7 @@ class Loader
             return $noArchiveFound;
         }
 
-        $idAndVisits = ArchiveSelector::getArchiveIdAndVisits($this->params, $minDatetimeArchiveProcessedUTC);
-
-        if (!$idAndVisits) {
-            return $noArchiveFound;
-        }
-
-        return $idAndVisits;
+        return $this->archiveDataStore->getArchiveIdAndVisits($this->params, $minDatetimeArchiveProcessedUTC);
     }
 
     /**
@@ -233,18 +240,17 @@ class Loader
 
     private function getIdSitesToArchiveWhenNoVisits()
     {
-        $cache = Cache::getTransientCache();
         $cacheKey = 'Archiving.getIdSitesToArchiveWhenNoVisits';
 
-        if (!$cache->contains($cacheKey)) {
+        if (!$this->transientCache->contains($cacheKey)) {
             $idSites = array();
 
             // leaving undocumented unless decided otherwise
             Piwik::postEvent('Archiving.getIdSitesToArchiveWhenNoVisits', array(&$idSites));
 
-            $cache->save($cacheKey, $idSites);
+            $this->transientCache->save($cacheKey, $idSites);
         }
 
-        return $cache->fetch($cacheKey);
+        return $this->transientCache->fetch($cacheKey);
     }
 }

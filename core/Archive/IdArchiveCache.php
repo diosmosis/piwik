@@ -70,6 +70,17 @@ class IdArchiveCache
         $this->idArchives[$idSite][$dateRange][$doneFlag] = $idArchive;
     }
 
+    public function setAll(array $idArchivesBySite)
+    {
+        foreach ($idArchivesBySite as $idSite => $byRange) {
+            foreach ($byRange as $dateRange => $byDoneFlag) {
+                foreach ($byDoneFlag as $doneFlag => $idArchive) {
+                    $this->set($idSite, $dateRange, $doneFlag, $idArchive);
+                }
+            }
+        }
+    }
+
     public function flushBySite(array $idSites)
     {
         foreach ($idSites as $idSite) {

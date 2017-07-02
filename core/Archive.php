@@ -8,10 +8,12 @@
  */
 namespace Piwik;
 
+use Piwik\Archive\ArchiveDataStore;
 use Piwik\Archive\IdArchiveCache;
 use Piwik\Archive\Parameters;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\Archive\ArchiveInvalidator;
+use Piwik\Cache\Transient;
 use Piwik\Container\StaticContainer;
 use Piwik\DataAccess\ArchiveSelector;
 use Piwik\Period\Factory as PeriodFactory;
@@ -140,6 +142,11 @@ class Archive
     private static $cache;
 
     /**
+     * @var Transient
+     */
+    private $transientCache; // TODO: shouldn't need self::$cache.
+
+    /**
      * @var ArchiveInvalidator
      */
     private $invalidator;
@@ -148,6 +155,11 @@ class Archive
      * @var IdArchiveCache
      */
     private $idArchiveCahe;
+
+    /**
+     * @var ArchiveDataStore
+     */
+    private $archiveDataStore;
 
     /**
      * @param Parameters $params
@@ -161,8 +173,10 @@ class Archive
         $this->forceIndexedBySite = $forceIndexedBySite;
         $this->forceIndexedByDate = $forceIndexedByDate;
 
+        $this->transientCache = StaticContainer::get(Transient::class);
         $this->invalidator = StaticContainer::get(ArchiveInvalidator::class);
         $this->idArchiveCahe = StaticContainer::get(IdArchiveCache::class);
+        $this->archiveDataStore = StaticContainer::get(ArchiveDataStore::class);
     }
 
     /**
@@ -559,7 +573,7 @@ class Archive
             return $result;
         }
 
-        $archiveData = ArchiveSelector::getArchiveData($archiveIds, $archiveNames, $archiveDataType, $idSubtable);
+        $archiveData = $this->archiveDataStore->getArchiveData($archiveIds, $archiveNames, $archiveDataType, $idSubtable);
 
         $isNumeric = $archiveDataType == 'numeric';
 
@@ -598,7 +612,8 @@ class Archive
         if (!Rules::isArchivingDisabledFor($this->params->getIdSites(), $this->params->getSegment(), $this->params->getPeriodLabel())) {
             $this->cacheArchiveIdsAfterLaunching($plugins);
         } else {
-            $this->cacheArchiveIdsWithoutLaunching($plugins);
+            $idArchives = $this->archiveDataStore->getArchiveIds($this->params, $archiveNames);
+            $this->idArchiveCahe->setAll($idArchives);
         }
 
         return $this->getIdArchivesByMonth($plugins);
@@ -648,28 +663,6 @@ class Archive
                 }
 
                 $this->prepareArchive($plugins, $site, $period);
-            }
-        }
-    }
-
-    /**
-     * Gets the IDs of the archives we're querying for and stores them in $this->archives.
-     * This function will not launch the archiving process (and is thus much, much faster
-     * than cacheArchiveIdsAfterLaunching).
-     *
-     * @param array $plugins List of plugin names from which data is being requested.
-     */
-    private function cacheArchiveIdsWithoutLaunching($plugins)
-    {
-        // TODO: if the archives already exist in the cache, we don't need to re-query
-        $idarchivesByReport = ArchiveSelector::getArchiveIds(
-            $this->params->getIdSites(), $this->params->getPeriods(), $this->params->getSegment(), $plugins);
-
-        foreach ($idarchivesByReport as $doneFlag => $idarchivesByDate) {
-            foreach ($idarchivesByDate as $dateRange => $idArchives) {
-                foreach ($idArchives as $idSite => $idArchive) {
-                    $this->idArchiveCahe->set($idSite, $dateRange, $doneFlag, $idArchive);
-                }
             }
         }
     }
@@ -738,7 +731,7 @@ class Archive
      * @throws \Exception If a plugin cannot be found or if the plugin for the report isn't
      *                    activated.
      */
-    private static function getPluginForReport($report)
+    public static function getPluginForReport($report)
     {
         // Core metrics are always processed in Core, for the requested date/period/segment
         if (in_array($report, Metrics::getVisitsMetricNames())) {
@@ -768,7 +761,7 @@ class Archive
     private function prepareArchive(array $plugins, Site $site, Period $period)
     {
         $parameters = new ArchiveProcessor\Parameters($site, $period, $this->params->getSegment());
-        $archiveLoader = new ArchiveProcessor\Loader($parameters);
+        $archiveLoader = new ArchiveProcessor\Loader($parameters, $this->archiveDataStore, $this->transientCache);
 
         $periodString = $period->getRangeString();
 
@@ -782,7 +775,7 @@ class Archive
             }
 
             $idArchive = $archiveLoader->prepareArchive($plugin);
-            $this->idArchiveCahe->set($idSite, $periodString, $doneFlag, $idArchive);
+            $this->idArchiveCahe->set($idSite, $period->getRangeString(), $doneFlag, $idArchive);
         }
     }
 

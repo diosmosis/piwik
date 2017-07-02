@@ -2,6 +2,8 @@
 
 use Interop\Container\ContainerInterface;
 use Interop\Container\Exception\NotFoundException;
+use Piwik\Archive\ArchiveDataStore;
+use Piwik\Archive\RelationalArchiveDataStore;
 use Piwik\Cache\Eager;
 use Piwik\SettingsServer;
 
@@ -89,4 +91,5 @@ return array(
     'Piwik\Tracker\Settings' => DI\object()
         ->constructorParameter('isSameFingerprintsAcrossWebsites', DI\get('ini.Tracker.enable_fingerprinting_across_websites')),
 
+    ArchiveDataStore::class => DI\object(RelationalArchiveDataStore::class),
 );
