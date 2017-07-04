@@ -13,6 +13,7 @@ use Piwik\Archive;
 use Piwik\Archive\Chunk;
 use Piwik\ArchiveProcessor;
 use Piwik\ArchiveProcessor\Rules;
+use Piwik\Cache\Transient;
 use Piwik\Common;
 use Piwik\Date;
 use Piwik\Db;
@@ -40,18 +41,38 @@ class ArchiveSelector
 
     const NB_VISITS_CONVERTED_RECORD_LOOKED_UP = "nb_visits_converted";
 
+    /**
+     * @var Archive\IdArchiveCache
+     */
+    private $idArchiveCache;
+
+    public function __construct(Archive\IdArchiveCache $idArchiveCache)
+    {
+        $this->idArchiveCache = $idArchiveCache;
+    }
+
     private static function getModel()
     {
         return new Model();
     }
 
-    public static function getArchiveIdAndVisits(ArchiveProcessor\Parameters $params, $minDatetimeArchiveProcessedUTC)
+    public function getArchiveIdAndVisits(ArchiveProcessor\Parameters $params, $minDatetimeArchiveProcessedUTC)
     {
         $idSite       = $params->getSite()->getId();
         $period       = $params->getPeriod()->getId();
         $dateStart    = $params->getPeriod()->getDateStart();
         $dateStartIso = $dateStart->toString('Y-m-d');
         $dateEndIso   = $params->getPeriod()->getDateEnd()->toString('Y-m-d');
+        $segment      = $params->getSegment();
+        $requestedPlugin = $params->getRequestedPlugin();
+        $periodRange  = $params->getPeriod()->getRangeString();
+        $periodLabel  = $params->getPeriod()->getLabel();
+        $doneFlag = Rules::getDoneStringFlagFor([$idSite], $segment, $periodLabel, $requestedPlugin);
+
+        if ($this->idArchiveCache->has($idSite, $periodRange, $doneFlag)) {
+            $idArchive = $this->idArchiveCache->get($idSite, $periodRange, $doneFlag);
+            return [$idArchive, false, false]; // TODO: document this function's results
+        }
 
         $numericTable = ArchiveTableCreator::getNumericTable($dateStart);
 
@@ -60,24 +81,27 @@ class ArchiveSelector
             $minDatetimeIsoArchiveProcessedUTC = Date::factory($minDatetimeArchiveProcessedUTC)->getDatetime();
         }
 
-        $requestedPlugin = $params->getRequestedPlugin();
-        $segment         = $params->getSegment();
         $plugins = array("VisitsSummary", $requestedPlugin);
 
         $doneFlags      = Rules::getDoneFlags($plugins, $segment);
         $doneFlagValues = Rules::getSelectableDoneFlagValues();
 
-        $results = self::getModel()->getArchiveIdAndVisits($numericTable, $idSite, $period, $dateStartIso, $dateEndIso, $minDatetimeIsoArchiveProcessedUTC, $doneFlags, $doneFlagValues);
+        $results = self::getModel()->getArchiveIdAndVisits($numericTable, $idSite, $period, $dateStartIso, $dateEndIso,
+            $minDatetimeIsoArchiveProcessedUTC, $doneFlags, $doneFlagValues);
 
         if (empty($results)) {
-            return false;
+            return [false, false, false];
         }
 
-        $idArchive = self::getMostRecentIdArchiveFromResults($segment, $requestedPlugin, $results);
+        $idArchive = $this->getMostRecentIdArchiveFromResults($segment, $requestedPlugin, $results);
 
-        $idArchiveVisitsSummary = self::getMostRecentIdArchiveFromResults($segment, "VisitsSummary", $results);
+        $idArchiveVisitsSummary = $this->getMostRecentIdArchiveFromResults($segment, "VisitsSummary", $results);
 
-        list($visits, $visitsConverted) = self::getVisitsMetricsFromResults($idArchive, $idArchiveVisitsSummary, $results);
+        list($visits, $visitsConverted) = $this->getVisitsMetricsFromResults($idArchive, $idArchiveVisitsSummary, $results);
+
+        if ($idArchive && $visits > 0) {// TODO: hasNonEmpty probably not needed
+            $this->idArchiveCache->set($idSite, $periodRange, $doneFlag, $idArchive);
+        }
 
         if (false === $visits && false === $idArchive) {
             return false;
@@ -86,7 +110,7 @@ class ArchiveSelector
         return array($idArchive, $visits, $visitsConverted);
     }
 
-    protected static function getVisitsMetricsFromResults($idArchive, $idArchiveVisitsSummary, $results)
+    protected function getVisitsMetricsFromResults($idArchive, $idArchiveVisitsSummary, $results)
     {
         $visits = $visitsConverted = false;
         $archiveWithVisitsMetricsWasFound = ($idArchiveVisitsSummary !== false);
@@ -114,7 +138,7 @@ class ArchiveSelector
         return array($visits, $visitsConverted);
     }
 
-    protected static function getMostRecentIdArchiveFromResults(Segment $segment, $requestedPlugin, $results)
+    protected function getMostRecentIdArchiveFromResults(Segment $segment, $requestedPlugin, $results)
     {
         $idArchive = false;
         $namesRequestedPlugin = Rules::getDoneFlags(array($requestedPlugin), $segment);
@@ -146,7 +170,7 @@ class ArchiveSelector
      *               )
      * @throws
      */
-    public static function getArchiveIds($siteIds, $periods, $segment, $plugins)
+    public function getArchiveIds($siteIds, $periods, $segment, $plugins)
     {
         if (empty($siteIds)) {
             throw new \Exception("Website IDs could not be read from the request, ie. idSite=");
@@ -159,7 +183,7 @@ class ArchiveSelector
         $getArchiveIdsSql = "SELECT idsite, name, date1, date2, MAX(idarchive) as idarchive
                                FROM %s
                               WHERE idsite IN (" . implode(',', $siteIds) . ")
-                                AND " . self::getNameCondition($plugins, $segment) . "
+                                AND " . $this->getNameCondition($plugins, $segment) . "
                                 AND %s
                            GROUP BY idsite, date1, date2";
 
@@ -209,7 +233,7 @@ class ArchiveSelector
                 //FIXMEA duplicate with Archive.php
                 $dateStr = $row['date1'] . ',' . $row['date2'];
 
-                $result[$row['name']][$dateStr][$row['idsite']] = $row['idarchive'];
+                $result[$row['idsite']][$dateStr][$row['name']] = $row['idarchive'];
             }
         }
 
@@ -228,7 +252,7 @@ class ArchiveSelector
      * @throws Exception
      * @return array
      */
-    public static function getArchiveData($archiveIds, $recordNames, $archiveDataType, $idSubtable)
+    public function getArchiveData($archiveIds, $recordNames, $archiveDataType, $idSubtable)
     {
         $chunk = new Chunk();
 
@@ -297,10 +321,10 @@ class ArchiveSelector
                 if ($isNumeric) {
                     $rows[] = $row;
                 } else {
-                    $row['value'] = self::uncompress($row['value']);
+                    $row['value'] = $this->uncompress($row['value']);
 
                     if ($chunk->isRecordNameAChunk($row['name'])) {
-                        self::moveChunkRowToRows($rows, $row, $chunk, $loadAllSubtables, $idSubtable);
+                        $this->moveChunkRowToRows($rows, $row, $chunk, $loadAllSubtables, $idSubtable);
                     } else {
                         $rows[] = $row;
                     }
@@ -311,7 +335,7 @@ class ArchiveSelector
         return $rows;
     }
 
-    private static function moveChunkRowToRows(&$rows, $row, Chunk $chunk, $loadAllSubtables, $idSubtable)
+    private function moveChunkRowToRows(&$rows, $row, Chunk $chunk, $loadAllSubtables, $idSubtable)
     {
         // $blobs = array([subtableID] = [blob of subtableId])
         $blobs = unserialize($row['value']);
@@ -341,7 +365,7 @@ class ArchiveSelector
         return $recordName . "_" . $id;
     }
 
-    private static function uncompress($data)
+    private function uncompress($data)
     {
         return @gzuncompress($data);
     }
@@ -354,7 +378,7 @@ class ArchiveSelector
      * @param Segment $segment
      * @return string
      */
-    private static function getNameCondition(array $plugins, Segment $segment)
+    private function getNameCondition(array $plugins, Segment $segment)
     {
         // the flags used to tell how the archiving process for a specific archive was completed,
         // if it was completed

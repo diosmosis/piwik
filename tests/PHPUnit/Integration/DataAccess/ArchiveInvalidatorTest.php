@@ -8,7 +8,6 @@
 
 namespace Piwik\Tests\Integration\DataAccess;
 
-use Piwik\Archive\IdArchiveCache;
 use Piwik\ArchiveProcessor\Rules;
 use Piwik\CronArchive\SitesToReprocessDistributedList;
 use Piwik\DataAccess\ArchiveTableCreator;
@@ -62,7 +61,7 @@ class ArchiveInvalidatorTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $this->invalidator = new ArchiveInvalidator(new Model(), new IdArchiveCache());
+        $this->invalidator = new ArchiveInvalidator(new Model());
     }
 
     public function test_rememberToInvalidateArchivedReportsLater_shouldCreateAnEntryInCaseThereIsNoneYet()

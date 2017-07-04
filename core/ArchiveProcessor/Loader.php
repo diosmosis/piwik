@@ -40,9 +40,15 @@ class Loader
      */
     protected $params;
 
-    public function __construct(Parameters $params)
+    /**
+     * @var ArchiveSelector
+     */
+    private $archiveSelector;
+
+    public function __construct(Parameters $params, ArchiveSelector $archiveSelector)
     {
         $this->params = $params;
+        $this->archiveSelector = $archiveSelector;
     }
 
     /**
@@ -168,7 +174,7 @@ class Loader
             return $noArchiveFound;
         }
 
-        $idAndVisits = ArchiveSelector::getArchiveIdAndVisits($this->params, $minDatetimeArchiveProcessedUTC);
+        $idAndVisits = $this->archiveSelector->getArchiveIdAndVisits($this->params, $minDatetimeArchiveProcessedUTC);
 
         if (!$idAndVisits) {
             return $noArchiveFound;
