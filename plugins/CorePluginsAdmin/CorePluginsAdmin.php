@@ -52,7 +52,7 @@ class CorePluginsAdmin extends Plugin
 
     public function getJsFiles(&$jsFiles)
     {
-        $jsFiles[] = "libs/bower_components/jQuery.dotdotdot/src/js/jquery.dotdotdot.min.js";
+        $jsFiles[] = "node_modules/dotdotdot/src/js/jquery.dotdotdot.min.js";
         $jsFiles[] = "plugins/CoreHome/javascripts/popover.js";
     }
 
@@ -64,5 +64,4 @@ class CorePluginsAdmin extends Plugin
         $translations[] = 'CoreAdminHome_PluginSettingsSaveSuccess';
         $translations[] = 'General_Save';
     }
-
 }

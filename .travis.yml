@@ -86,19 +86,30 @@ script: $PIWIK_ROOT_DIR/tests/travis/travis.sh
 before_install:
   - ./tests/travis/install_git_lfs.sh
 
+  # TODO: add to travis yml generate
+  - . $HOME/.nvm/nvm.sh
+  - nvm install stable
+  - nvm use stable
+  - sudo apt-key adv --fetch-keys http://dl.yarnpkg.com/debian/pubkey.gpg
+  - echo "deb http://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+  - sudo apt-get update -qq
+  - sudo apt-get install -y -qq yarn
+
 install:
   - git fetch -q
 
   - export GENERATE_TRAVIS_YML_COMMAND="php ./tests/travis/generator/main.php generate:travis-yml --core --verbose"
-  - '[[ "$TRAVIS_JOB_NUMBER" != *.1 || "$TRAVIS_PULL_REQUEST" != "false" ]] || ./tests/travis/autoupdate_travis_yml.sh'
+  # TODO: disable autoupdate for now
+  # - '[[ "$TRAVIS_JOB_NUMBER" != *.1 || "$TRAVIS_PULL_REQUEST" != "false" ]] || ./tests/travis/autoupdate_travis_yml.sh'
 
   - ./tests/travis/configure_git.sh
 
   # travis now complains about this failing 9 times out of 10, so removing it
   #- travis_retry composer self-update
   - '[ "$SKIP_COMPOSER_INSTALL" == "1" ] || travis_retry composer install' 
- 
 
+  # TODO: this has to be added to generate command
+  - travis_retry yarn install
 
 before_script:
   - if [[ "$TRAVIS_PHP_VERSION" != 7* ]]; then phpenv config-rm xdebug.ini; fi
