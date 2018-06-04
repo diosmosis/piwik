@@ -126,9 +126,10 @@ Application.prototype.loadTestModules = function () {
     });
 
     // filter suites to run
+    options.tests = ['ViewDataTableTest'];
     if (options.tests.length) {
         mocha.suite.suites = mocha.suite.suites.filter(function (suite) {
-            return options.tests.indexOf(suite.title) != -1;
+            return options.tests.indexOf(suite.title) !== -1;
         });
     }
 
